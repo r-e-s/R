@@ -1,0 +1,36 @@
+library(twitteR)
+library(ROAuth)
+library(stringr)
+library(ggplot2)
+library(streamR)
+library(igraph)
+
+load("cred.RData")
+
+setup_twitter_oauth(consumerKey, consumerSecret, ACCESS_TOKEN, ACCESS_secret)
+
+fol.ids <- getUser("Username_whos_network_you_want")$getFollowerIDs()
+
+level2.fol.idsA <- lapply(fol.ids[1:length(fol.ids)],function(x){
+  Sys.sleep(length(fol.ids)+rpois(1,4.5)) # API lässt nur 15 GET/followerIDs alle 15min zu
+  return(getUser(x)$getFollowerIDs())
+})
+
+li <- lapply(level2.fol.idsA,function(x){fol.ids[fol.ids%in%x]})
+
+df <- data.frame(matrix(rep(0,length(fol.ids)^2),length(fol.ids),length(fol.ids)))
+colnames(df) <- as.character(fol.ids)
+rownames(df) <- as.character(fol.ids)
+
+for(i in 1:length(li)){
+  df[as.character(li[[i]]),fol.ids[i]] <- rep(1,length(li[[i]]))
+}
+
+u <- lookupUsers(fol.ids)
+user.names <- do.call("rbind",lapply(u,function(u){u$screenName}))
+colnames(df) <- user.names
+rownames(df) <- user.names
+
+g <- graph.adjacency(as.matrix(df))
+plot.igraph(g)
+write.graph(g,"yourgraph.graphml",format="graphml")
